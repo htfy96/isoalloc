@@ -3,6 +3,7 @@
 #define _POSIX_C_SOURCE 200809L
 #include <stdlib.h>
 #include <assert.h>
+#include <malloc.h>
 #include "iso_alloc.h"
 #include "iso_alloc_internal.h"
 
@@ -117,6 +118,57 @@ int main(int argc, char *argv[]) {
     }
     free(ap);
 
+    rr = posix_memalign((void **) &ap, 16, 24);
+    if(ap == NULL || rr != 0 || ((uintptr_t) ap % 16) != 0) {
+        LOG_AND_ABORT("ap %p | %d != 0", ap, (uintptr_t) ap % 16);
+    }
+    assert(iso_chunksz(ap) >= 24);
+    free(ap);
+
+    rr = posix_memalign((void **) &ap, 16, 41);
+    if(ap == NULL || rr != 0 || ((uintptr_t) ap % 16) != 0) {
+        LOG_AND_ABORT("ap %p | %d != 0", ap, (uintptr_t) ap % 16);
+    }
+    assert(iso_chunksz(ap) >= 41);
+    free(ap);
+
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wnon-power-of-two-alignment"
+#endif
+    ap = aligned_alloc(3, 31);
+    if(ap != NULL) {
+        LOG_AND_ABORT("aligned_alloc returned non-null for bad alignment: %p", ap);
+    }
+    free(ap);
+
+    ap = aligned_alloc(4, 31);
+    if(ap != NULL) {
+        LOG_AND_ABORT("aligned_alloc returned non-null for bad alignment: %p", ap);
+    }
+    free(ap);
+
+    ap = aligned_alloc(16, 32);
+    if(ap == NULL || ((uintptr_t) ap % 16) != 0) {
+        LOG_AND_ABORT("aligned_alloc(16, 32) returned NULL or unaligned pointer: %p", ap);
+    }
+    assert(iso_chunksz(ap) >= 32);
+    free(ap);
+
+    ap = memalign(3, 32);
+    if(ap != NULL) {
+        LOG_AND_ABORT("memalign(3, 32) returned non-NULL %p", ap);
+    }
+    free(ap);
+
+    ap = memalign(16, 33);
+    if(ap == NULL || ((uintptr_t) ap % 16) != 0) {
+        LOG_AND_ABORT("memalign(16, 33) returned NULL or unaligned pointer: %p", ap);
+    }
+    free(ap);
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
 #if HEAP_PROFILER
     iso_alloc_traces_t at[BACKTRACE_DEPTH_SZ];
     size_t alloc_trace_count = iso_get_alloc_traces(at);

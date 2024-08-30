@@ -54,14 +54,12 @@ EXTERNAL_API void *reallocarray(void *p, size_t n, size_t s) {
 }
 
 EXTERNAL_API int __posix_memalign(void **r, size_t a, size_t s) {
-    if(is_pow2(a) == false) {
+    if(is_pow2(a) == false || (a % sizeof(void *) != 0)) {
         *r = NULL;
         return EINVAL;
     }
-
-    if(s < a) {
-        s = a;
-    }
+    // Round up to the nearest multiple of a
+    s = (s + a - 1) & ~(a - 1);
 
     *r = iso_alloc(s);
 
@@ -77,16 +75,25 @@ EXTERNAL_API int posix_memalign(void **r, size_t alignment, size_t s) {
 }
 
 EXTERNAL_API void *__libc_memalign(size_t alignment, size_t s) {
+    if(!is_pow2(alignment)) {
+        return NULL;
+    }
     /* All iso_alloc allocations are 8 byte aligned */
     return iso_alloc(s);
 }
 
 EXTERNAL_API void *aligned_alloc(size_t alignment, size_t s) {
     /* All iso_alloc allocations are 8 byte aligned */
+    if(!is_pow2(alignment) || (s % alignment) != 0) {
+        return NULL;
+    }
     return iso_alloc(s);
 }
 
 EXTERNAL_API void *memalign(size_t alignment, size_t s) {
+    if(!is_pow2(alignment)) {
+        return NULL;
+    }
     /* All iso_alloc allocations are 8 byte aligned */
     return iso_alloc(s);
 }
@@ -119,6 +126,9 @@ static void libc_free(void *ptr, const void *caller) {
     iso_free(ptr);
 }
 static void *libc_memalign(size_t alignment, size_t s, const void *caller) {
+    if(!is_pow2(alignment)) {
+        return NULL;
+    }
     return iso_alloc(s);
 }
 
